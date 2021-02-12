@@ -1,0 +1,80 @@
+---
+- hosts: all
+  tasks:
+    - name: update packages (apt-get update)
+      become: true
+      become_user: root
+      apt:
+        update_cache: yes
+
+    - name: Upgrade the OS (apt-get dist-upgrade)
+      become: true
+      become_user: root
+      apt:
+        upgrade: dist
+
+    - name: install packages (apt-get install "packages")
+      become: true
+      become_user: root
+      apt:
+        state: latest
+        force_apt_get: yes
+        name:
+         - net-tools
+         - curl
+         - python3-pip
+         - virtualenv
+         - python3-setuptools
+         - aptitude
+         - docker
+         - docker-compose
+         - git
+
+    - name: Add Docker GPG apt Key
+      become: true
+      become_user: root
+      apt_key:
+        url: https://download.docker.com/linux/ubuntu/gpg
+        state: present
+
+    - name: Add the user 'netbox'
+      become: true
+      become_user: root
+      ansible.builtin.user:
+        name: netbox
+        comment: netbox user
+
+    - name: Git clone netbox
+      become: true
+      become_user: root
+      ansible.builtin.git:
+        repo: 'https://github.com/netbox-community/netbox-docker.git'
+        dest: /home/netbox/projects/netbox-docker
+        version: release
+
+    - name: Creating docker-compose.override.yml
+      become: true
+      become_user: root
+      copy:
+        dest: "/home/netbox/projects/netbox-docker/docker-compose.override.yml"
+        content: |
+          version: '3.4'
+          services:
+            netbox:
+              ports:
+                - 8000:8080
+
+    - name: Change the working directory and issue docker compose pull
+      become: true
+      become_user: root
+      shell: "docker-compose pull"
+      args:
+        chdir: /home/netbox/projects/netbox-docker/
+      changed_when: "'... pull complete' in result.stderr | default('')"
+
+    - name: Change the working directory and issue docker compose up
+      become: true
+      become_user: root
+      shell: "docker-compose up -d"
+      args:
+        chdir: /home/netbox/projects/netbox-docker/
